@@ -145,5 +145,71 @@ yamlParser :: Parser YamlValue
 yamlParser = YObject <$> some yamlKeyValueP 
 
 
+-- =========== custom .md variant parser ===========
+
+data TextFormat = None | Bold | Italic | BoldItalic 
+    deriving (Show, Eq)
+type Color = String
+type HeaderLevel = Int
+type IsDisplay = Bool
+type URL = String
+type SizeTag = String
+type IsOrdered = Bool
+
+data MarkdownItem
+    = Linebreak
+    | Plaintext String  TextFormat Color
+    | Header    String  HeaderLevel
+    | Math      String  IsDisplay
+    | Code      String  String IsDisplay    -- src, language, display=code block
+    | Image     String  URL SizeTag
+    | Link      String  URL
+    | Quote     String
+    | RawHtml   String
+    | FootRef   Int
+    | FootDef   Int     [MarkdownItem]
+    | Dropdown  String  [MarkdownItem]
+    | List      String  [MarkdownItem] IsOrdered
+    | Paragraph [MarkdownItem]          -- purely logical
+
+parseMarkdown :: String -> [MarkdownItem]
+parseMarkdown = undefined
+
+processMarkdown :: [MarkdownItem] -> [MarkdownItem]
+processMarkdown = id        -- chain text into paragraphs, etc
+
+replace :: String -> String -> String -> String
+replace [] _ str = str
+replace target new str@(x:xs)
+    | take (length target) str == target = new ++ drop (length target) str
+    | otherwise = x : replace target new xs
+
+fmt :: String -> [String] -> String
+fmt = foldl (flip (replace "{}")) 
+-- TODO fix unsafe!!!! fails if more vars than {}'s
+
+fmt1 :: String -> String -> String
+fmt1 = replace "{}"
+
+renderMarkdown :: MarkdownItem -> String
+renderMarkdown m = case m of
+    Linebreak               -> ""
+    Header s 0              -> tagEnclose "h1" s ++ "<hr><br>"
+    Header s 1              -> tagEnclose "h2" s      -- oh u need more? no u dont
+    Code src lang True      -> tagEnclose "pre" $ tagEnclose "code" $ highlight src lang
+    Code src lang False     -> spanClass "inline-code" $ highlight src lang
+    Image alt url size      -> fmt imageTemplate [url, size, alt]
+    Link txt url            -> fmt linkTemplate [url, txt]
+    _                       -> "<h1> TODO </h1>"
+    
+    where   tagEnclose t s  = concat ["<", t, ">", s, "</", t, ">"]
+            spanClass c s   = "<span class=\"" ++ c ++ "\">" ++ s ++ "</span>"
+            imageTemplate   = "<img src=\"{}\" class=\"{}\" alt=\"{}\">"
+            linkTemplate    = "<a href=\"{}\">{}</a>"
+            highlight s l   = s       -- todo: syntax highlighting
+
+markdownToHtml :: String -> String
+markdownToHtml = concatMap renderMarkdown . processMarkdown . parseMarkdown
+
 
 
