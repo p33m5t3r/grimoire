@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Templating where
 import qualified Data.Map as Map
+import Parser
+import Data.Char (isLetter)
 
 -- template :: String -> Context -> String
 -- template t c = t ++ " templated w/ " ++ c
@@ -18,8 +20,17 @@ data Context = String String
              deriving Show
 
 
-template :: String -> Context -> Maybe String
-template t = render (parse t)
+template :: String -> Context -> Either String String
+template t c = 
+    let err' = "failed to finish parsing"
+    in case runP templateParser (newInput t) of
+        Left err -> Left $ "failed to parse: " ++ show err
+        Right (t, rest) -> 
+            if src rest == "" 
+                then case render t c of
+                    Nothing -> Left "failed to render"
+                    Just s -> Right s
+                else Left err'
 
 parse :: String -> Template
 parse = undefined
@@ -76,4 +87,53 @@ myTemplate = Block [
 
 myRawTemplate :: String
 myRawTemplate = "<div> {% for post in posts %} <p> {{post.contents}} </p> {% endfor %} </div>"
+
+parseTemplate :: String -> Either ParseError (Template, Input)
+parseTemplate = runP templateParser . newInput
+
+templateParser :: Parser Template
+templateParser = Block <$> many templatePart
+
+templatePart :: Parser Template
+templatePart = literalParser 
+          <|> exprParser
+          <|> loopParser
+
+-- Parse literal text until we hit {{ or {%
+literalParser :: Parser Template
+literalParser = Literal <$> some notTagStart
+  where
+    notTagStart = char >>= \c -> 
+      Parser $ \i -> case c of
+        '{' -> case src i of
+          ('{':_) -> Left ("tag start", pos i)
+          ('%':_) -> Left ("tag start", pos i)
+          _       -> Right (c, i)
+        _   -> Right (c, i)
+
+-- Parse {{path.to.value}} expressions
+exprParser :: Parser Template
+exprParser = Expr <$> betweenWS "{{" "}}" pathParser
+  where
+    pathParser = sepBy (some $ cond isValidIdChar) (one '.')
+    isValidIdChar c = isLetter c || c == '_'
+
+loopParser :: Parser Template
+loopParser = do
+    (collection, var) <- betweenWS "{%" "%}" forHeader  -- Using betweenWS like exprParser
+    template <- templateParser
+    betweenWS "{%" "%}" (word "endfor")  -- Match end tag with whitespace handling
+    return $ Loop var collection template
+  where
+    forHeader = do
+        word "for"
+        ws
+        var <- some $ cond isLetter
+        ws
+        word "in"
+        ws
+        collection <- some $ cond isLetter
+        return (var, collection)
+
+
 

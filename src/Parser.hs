@@ -1,4 +1,28 @@
-module Parser where
+module Parser 
+    ( Parser(..)
+    , ParseError
+    , Position
+    , Input(..)
+    , newInput
+    -- Essential parsing primitives
+    , char
+    , cond
+    , one
+    , word
+    -- Utility parsers
+    , ws
+    , spaces
+    , alphanum
+    , some
+    , between
+    , betweenWS
+    , sepBy
+    -- Re-exports from Control.Applicative for convenience
+    , (<|>)
+    , many
+    , empty
+    ) where
+
 import Control.Applicative (many, Alternative, empty, (<|>))
 import Data.Char (isAlphaNum)
 
@@ -88,7 +112,7 @@ cond p = char >>= \c ->
     Parser $ \i -> if p c
         then Right (c, i)
         else Left  (condErrMsg c, pos i)
-        
+
 one :: Char -> Parser Char
 one c = cond (== c)
 
@@ -101,21 +125,28 @@ ws = many $ cond (`elem` " \t\n")
 spaces :: Parser String
 spaces = many $ one ' '
 
+-- TODO: add proper strings with escapes and unicode
 alphanum :: Parser String
 alphanum = some $ cond isAlphaNum
 
--- TODO: add proper strings with escapes and unicode
+word :: String -> Parser String
+word = foldr (\ c -> (<*>) ((:) <$> one c)) (pure [])
 
-between :: Char -> Char -> Parser a -> Parser a
-between c1 c2 p = one c1 *> p <* one c2
+between :: String -> String -> Parser a -> Parser a
+between w1 w2 p = word w1 *> p <* word w2
 
-betweenWS :: Char -> Char -> Parser a -> Parser a
-betweenWS c1 c2 p = one c1 *> ws *> p <* ws <* one c2
+betweenWS :: String -> String -> Parser a -> Parser a
+betweenWS w1 w2 p = word w1 *> ws *> p <* ws <* word w2
 
+sepBy :: Parser a -> Parser b -> Parser [a]
+sepBy p sep = (:) <$> p <*> many (sep *> p)
+
+-- TODO: just take words not chars
 delimited :: Char -> Char -> Char -> Parser a -> Parser [a]
-delimited open sep close p = betweenWS open close contents
+delimited open sep close p = betweenWS' open close contents
     where 
         sepWs = ws *> one sep *> ws
+        betweenWS' c1 c2 p' = one c1 *> ws *> p' <* ws <* one c2
         contents = (:) <$> p <*> many (sepWs *> p) <|> pure []
 
 
@@ -146,6 +177,19 @@ yamlParser = YObject <$> some yamlKeyValueP
 
 
 -- =========== custom .md variant parser ===========
+
+replace :: String -> String -> String -> String
+replace [] _ str = str
+replace target new str@(x:xs)
+    | take (length target) str == target = new ++ drop (length target) str
+    | otherwise = x : replace target new xs
+
+fmt :: String -> [String] -> String
+fmt = foldl (flip (replace "{}")) 
+-- TODO fix unsafe!!!! fails if more vars than {}'s
+
+fmt1 :: String -> String -> String
+fmt1 = replace "{}"
 
 data TextFormat = None | Bold | Italic | BoldItalic 
     deriving (Show, Eq)
@@ -178,19 +222,6 @@ parseMarkdown = undefined
 processMarkdown :: [MarkdownItem] -> [MarkdownItem]
 processMarkdown = id        -- chain text into paragraphs, etc
 
-replace :: String -> String -> String -> String
-replace [] _ str = str
-replace target new str@(x:xs)
-    | take (length target) str == target = new ++ drop (length target) str
-    | otherwise = x : replace target new xs
-
-fmt :: String -> [String] -> String
-fmt = foldl (flip (replace "{}")) 
--- TODO fix unsafe!!!! fails if more vars than {}'s
-
-fmt1 :: String -> String -> String
-fmt1 = replace "{}"
-
 renderMarkdown :: MarkdownItem -> String
 renderMarkdown m = case m of
     Linebreak               -> ""
@@ -200,12 +231,15 @@ renderMarkdown m = case m of
     Code src lang False     -> spanClass "inline-code" $ highlight src lang
     Image alt url size      -> fmt imageTemplate [url, size, alt]
     Link txt url            -> fmt linkTemplate [url, txt]
+    Quote s                 -> fmt1 quoteTemplate s
+    RawHtml h               -> h
     _                       -> "<h1> TODO </h1>"
     
     where   tagEnclose t s  = concat ["<", t, ">", s, "</", t, ">"]
             spanClass c s   = "<span class=\"" ++ c ++ "\">" ++ s ++ "</span>"
             imageTemplate   = "<img src=\"{}\" class=\"{}\" alt=\"{}\">"
             linkTemplate    = "<a href=\"{}\">{}</a>"
+            quoteTemplate   = "<p class=\"quote\"> {} </p>"
             highlight s l   = s       -- todo: syntax highlighting
 
 markdownToHtml :: String -> String
