@@ -144,44 +144,11 @@ betweenWS w1 w2 p = word w1 *> ws *> p <* ws <* word w2
 sepBy :: Parser a -> Parser b -> Parser [a]
 sepBy p sep = (:) <$> p <*> many (sep *> p)
 
--- TODO: just take words not chars
-delimited :: Char -> Char -> Char -> Parser a -> Parser [a]
-delimited open sep close p = betweenWS' open close contents
-    where 
-        sepWs = ws *> one sep *> ws
-        betweenWS' c1 c2 p' = one c1 *> ws *> p' <* ws <* one c2
-        contents = (:) <$> p <*> many (sepWs *> p) <|> pure []
-
 notChar :: Char -> Parser Char
 notChar c = cond (/= c)
 
 anyCharTill :: String -> Parser String
 anyCharTill end = many (notChar (head end)) <* word end
-
--- =========== yaml parser ===========
-data YamlValue = YString String
-               | YArray  [String]
-               | YObject [(String, YamlValue)]
-               deriving (Show, Eq)
-
-
-yamlStrP :: Parser YamlValue
-yamlStrP = YString <$> ((spaces *> alphanum) <* ws)
-
-yamlArrP :: Parser YamlValue
-yamlArrP = YArray <$> (ws *> delimited '[' ',' ']' alphanum)
-
-yamlKeyP :: Parser String
-yamlKeyP = ((ws *> alphanum) <* spaces) <* one ':'
-
-yamlValueP :: Parser YamlValue
-yamlValueP = yamlStrP <|> yamlArrP
-
-yamlKeyValueP :: Parser (String, YamlValue)
-yamlKeyValueP = (,) <$> yamlKeyP <*> yamlValueP
-
-yamlParser :: Parser YamlValue
-yamlParser = YObject <$> some yamlKeyValueP 
 
 
 
