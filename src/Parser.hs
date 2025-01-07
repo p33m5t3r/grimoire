@@ -17,6 +17,8 @@ module Parser
     , between
     , betweenWS
     , sepBy
+    , notChar
+    , anyCharTill
     -- Re-exports from Control.Applicative for convenience
     , (<|>)
     , many
@@ -150,6 +152,11 @@ delimited open sep close p = betweenWS' open close contents
         betweenWS' c1 c2 p' = one c1 *> ws *> p' <* ws <* one c2
         contents = (:) <$> p <*> many (sepWs *> p) <|> pure []
 
+notChar :: Char -> Parser Char
+notChar c = cond (/= c)
+
+anyCharTill :: String -> Parser String
+anyCharTill end = many (notChar (head end)) <* word end
 
 -- =========== yaml parser ===========
 data YamlValue = YString String

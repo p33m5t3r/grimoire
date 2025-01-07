@@ -232,15 +232,15 @@ testParagraph = parserTest
     ])
 
 -- Test cases for full documents
--- testDocument :: TestExpect String (Either ParseError [MarkdownItem])
--- testDocument = parserTest 
---     "basic document" 
---     document 
---     "para 1\n\npara 2" 
---     (Right [
---         Paragraph [Plaintext "para" None "", Plaintext "1" None ""],
---         Paragraph [Plaintext "para" None "", Plaintext "2" None ""]
---     ])
+testDocument :: TestExpect String (Either ParseError [MarkdownItem])
+testDocument = parserTest 
+    "basic document" 
+    document 
+    "\n\npara 1\n\npara 2\n\n" 
+    (Right [
+        Paragraph [Plaintext "para 1" None ""],
+        Paragraph [Plaintext "para 2" None ""]
+    ])
 
 -- Run all tests
 runMarkdownTests :: IO ()
@@ -266,3 +266,5 @@ runMarkdownTests = do
         , testDropdown
         , testParagraph
         ]
+    runTestExpect testDocument
+

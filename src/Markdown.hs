@@ -37,21 +37,15 @@ renderMarkdown :: [MarkdownItem] -> String
 renderMarkdown = concatMap renderItem
 
 -- Main parsing function
-parseMarkdown :: String -> Either String [MarkdownItem]
-parseMarkdown s = case runP document $ newInput s of
+parseMarkdown :: Input -> Either String [MarkdownItem]
+parseMarkdown s = case runP document s of
     Left err -> Left $ show err
     Right (md, rest) -> if src rest == "" 
         then Right md 
-        else Left ".md parsing unfinished"
+        else Left $ ".md parsing unfinished: " ++ show rest
 
 -- PARSING
 -- more parser combinators
-notChar :: Char -> Parser Char
-notChar c = cond (/= c)
-
-anyCharTill :: String -> Parser String
-anyCharTill end = many (notChar (head end)) <* word end
-
 escaped :: Parser Char
 escaped = one '\\' *> char
 
@@ -72,13 +66,40 @@ boldText = Plaintext <$> between "*" "*" (escapedString '*') <*> pure Bold <*> p
 italicText :: Parser MarkdownItem
 italicText = Plaintext <$> between "_" "_" (escapedString '_') <*> pure Italic <*> pure ""
 
-plaintext :: Parser MarkdownItem
-plaintext = Plaintext <$> some (notChar ' ' >>= \c -> 
-    if c `elem` "*_$`#[]<\n" 
-    then fail "reserved character"
-    else pure c) <*> pure None <*> pure ""
 
--- Code blocks
+-- Modified plaintext parser that won't consume past potential paragraph breaks
+plaintext :: Parser MarkdownItem
+plaintext = do
+    -- Get first chunk
+    first <- textChunk
+    -- Get subsequent chunks separated by single newlines, but not double newlines
+    rest <- many (try singleNewlineChunk)
+    pure $ Plaintext (collapseWhitespace (concat (first:rest))) None ""
+  where
+    textChunk = some (char >>= \c -> 
+        if c `elem` "*_$`#[]<\n" 
+        then fail "reserved character"
+        else pure c)
+    
+    -- Only consume a newline if it's not followed by another newline
+    singleNewlineChunk = do
+        n1 <- one '\n'
+        n2 <- char
+        if n2 == '\n'
+            then fail "double newline"  -- Don't consume double newlines
+            else (n2:) <$> textChunk    -- Include the char we peeked
+
+-- Try combinator - attempt a parse but backtrack on failure
+try :: Parser a -> Parser a
+try p = Parser $ \input -> case runP p input of
+    Left _ -> Left ("backtrack", pos input)
+    Right (a, rest) -> Right (a, rest)
+
+-- Helper for handling whitespace in text
+collapseWhitespace :: String -> String
+collapseWhitespace = unwords . words-- Code blocks
+
+-- code
 inlineCode :: Parser MarkdownItem
 inlineCode = Code 
     <$> between "```" "```" (escapedString '`')
@@ -188,21 +209,37 @@ markdownItem = choice
     where
         choice = foldr (<|>) (fail "no matching parser")
 
--- Parse paragraphs by grouping items between double newlines
--- Combine consecutive markdown items in a paragraph
 paragraph :: Parser MarkdownItem
-paragraph = Paragraph <$> sepBy1 markdownItem spaces
+paragraph = do
+    items <- sepBy1 markdownItem (many (oneOf " \t"))  -- Don't consume newlines here
+    pure $ Paragraph (combineText items)
+  where
+    combineText :: [MarkdownItem] -> [MarkdownItem]
+    combineText [] = []
+    combineText (Plaintext s1 fmt1 c1 : Plaintext s2 fmt2 c2 : rest)
+        | fmt1 == fmt2 && c1 == c2 = 
+            combineText (Plaintext (s1 ++ " " ++ s2) fmt1 c1 : rest)
+    combineText (x:xs) = x : combineText xs
 
--- Helper for one or more items
+
+-- Improved document parser that splits on double newlines
+document :: Parser [MarkdownItem]
+document = do
+    many (oneOf " \t\n")  -- Consume leading whitespace
+    items <- sepBy paragraph (word "\n\n")
+    many (oneOf " \t\n")  -- Consume trailing whitespace
+    pure items
+
+oneOf :: String -> Parser Char
+oneOf chars = char >>= \c -> 
+    if c `elem` chars 
+    then pure c 
+    else fail $ "expected one of: " ++ chars
+
 sepBy1 :: Parser a -> Parser b -> Parser [a]
 sepBy1 p sep = (:) <$> p <*> many (sep *> p)
 
-document :: Parser [MarkdownItem]
-document = sepBy paragraph (word "\n\n")
-
 -- RENDERING
-
-
 -- Individual item renderers
 renderItem :: MarkdownItem -> String
 renderItem item = case item of
