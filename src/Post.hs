@@ -15,8 +15,6 @@ import System.Directory (listDirectory
                         )
 import System.FilePath ((</>))
 
--- TODO: compile a post.md file to post.hmtl with a template
---       compile index.html from a template
 
 type PostMetadata = Map.Map String String
 
@@ -26,6 +24,15 @@ data AppConfig = AppConfig
     , postTemplatePath  :: FilePath
     , indexTemplatePath :: FilePath
     , indexHtmlPath     :: FilePath
+    }
+
+myAppConfig :: AppConfig
+myAppConfig = AppConfig
+    { postsDir = "posts"
+    , compiledDir = "compiled"
+    , postTemplatePath = "templates/post.html"
+    , indexTemplatePath = "templates/index.html"
+    , indexHtmlPath = "compiled/index.html"
     }
 
 compile :: AppConfig -> IO ()
