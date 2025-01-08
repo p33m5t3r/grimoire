@@ -1,4 +1,4 @@
-module Post where
+module Compile where
 import qualified Data.Map as Map
 import Templating (Template(..), Context(..), render, parseTemplate)
 import Markdown (renderMarkdown, parseMarkdown, MarkdownItem)
@@ -24,7 +24,7 @@ data AppConfig = AppConfig
     , postTemplatePath  :: FilePath
     , indexTemplatePath :: FilePath
     , indexHtmlPath     :: FilePath
-    }
+    } deriving Show
 
 myAppConfig :: AppConfig
 myAppConfig = AppConfig
@@ -35,45 +35,66 @@ myAppConfig = AppConfig
     , indexHtmlPath = "compiled/index.html"
     }
 
-compile :: AppConfig -> IO ()
-compile cfg = do
-    result <- runExceptT $ do
+compileAll :: AppConfig -> IO ()
+compileAll cfg = compileExcept $ do
+    -- Read and parse templates
+    postTemplate <- loadTemplate $ postTemplatePath cfg
+    indexTemplate <- loadTemplate $ indexTemplatePath cfg
 
-        -- Read and parse templates
-        postTemplateStr <- liftIO $ readFile $ postTemplatePath cfg
-        postTemplate <- ExceptT . return . mapLeft show $ parseTemplate postTemplateStr
+    -- make sure compiled directory exists
+    liftIO $ ensureDirectory $ compiledDir cfg
+
+    -- read posts
+    filenames <- liftIO $ listDirectory $ postsDir cfg
+    let posts = map (postIOPath cfg) filenames
+
+    -- Process all posts
+    compiledPosts <- forM posts $ \(inPath, outPath) -> do
+        content <- liftIO $ readFile inPath
+        (html, meta) <- ExceptT . return $ compilePost postTemplate content
+        liftIO $ writeFile outPath html
+        return meta
         
-        indexTemplateStr <- liftIO $ readFile $ indexTemplatePath cfg
-        indexTemplate <- ExceptT . return . mapLeft show $ parseTemplate indexTemplateStr
+    -- Compile and write index
+    indexHtml <- ExceptT . return $ compileIndex indexTemplate compiledPosts
+    liftIO $ writeFile (indexHtmlPath cfg) indexHtml
 
-        -- make sure compiled directory exists
-        liftIO $ ensureDirectory $ compiledDir cfg
+    return $ "compiled " ++ show (length compiledPosts) ++ " posts"
 
-        -- read posts
-        filenames <- liftIO $ listDirectory $ postsDir cfg
-        let posts = map postIOPath filenames
+compileOne :: FilePath -> AppConfig -> IO()
+compileOne filename cfg = compileExcept $ do
+    postTemplate <- loadTemplate $ postTemplatePath cfg
+    liftIO $ ensureDirectory $ compiledDir cfg
 
-        -- Process all posts
-        compiledPosts <- forM posts $ \(inPath, outPath) -> do
-            content <- liftIO $ readFile inPath
-            (html, meta) <- ExceptT . return $ compilePost (fst postTemplate) content
-            liftIO $ writeFile outPath html
-            return meta
-            
-        -- Compile and write index
-        indexHtml <- ExceptT . return $ compileIndex (fst indexTemplate) compiledPosts
-        liftIO $ writeFile (indexHtmlPath cfg) indexHtml
-        
-        return $ length compiledPosts
+    let (inPath, outPath) = postIOPath cfg filename
+    content <- liftIO $ readFile inPath 
+    (html, _) <- ExceptT . return $ compilePost postTemplate content
+    
+    liftIO $ writeFile outPath html
+    return $ "compiled " ++ filename
 
+
+compileExcept :: ExceptT String IO String -> IO ()
+compileExcept action = do
+    result <- runExceptT action
     case result of
         Left err -> putStrLn $ "Compilation failed: " ++ err
-        Right n -> putStrLn $ "Successfully compiled " ++ show n ++ " posts"
+        Right msg -> putStrLn $ "Success: " ++ msg
 
- where rep t n = map (\x -> if x == t then n else x)
-       changeExtension e f = head (words $ rep '.' ' ' f) ++ '.':e
-       postIOPath relpath = (postsDir cfg </> relpath
-                            ,changeExtension "html" (compiledDir cfg </> relpath))
+loadTemplate :: FilePath -> ExceptT String IO Template
+loadTemplate path = do
+    template <- liftIO $ readFile path
+    ExceptT . return . mapLeft show . fmap fst $ parseTemplate template
+
+-- todo: fix this hacky extension swap fn
+changeExtension :: String -> String -> String
+changeExtension ext path = head (words $ rep '.' ' ' path) ++ '.':ext
+    where rep t n = map (\x -> if x == t then n else x)
+
+-- "post.md" -> "(posts/post.md, compiled/post.html)"
+postIOPath :: AppConfig -> FilePath -> (FilePath, FilePath)
+postIOPath cfg relpath = ( postsDir cfg </> relpath
+                         , changeExtension "html" (compiledDir cfg </> relpath))
 
 compileIndex :: Template -> [PostMetadata] -> Either String String
 compileIndex t posts = render t $ indexContext posts

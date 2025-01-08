@@ -1,4 +1,4 @@
-module Main where
+module Web where
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import System.Directory (getDirectoryContents
@@ -12,12 +12,7 @@ import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Monad (forever)
 
-
-{- usage
-grimoire compile
-grimoire serve
-grimoire serve --dev
--}
+-- Eventually i'll have a development server...
 
 type Path = [String]
 type Cache = Map.Map String String
