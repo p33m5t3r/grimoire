@@ -1,43 +1,34 @@
 module Tests where
-import Markdown
-import Parser
-import Templating (template, render, parseTemplate, Context(..), Template(..))
+
 import qualified Data.Map as Map
 
-runTests :: IO ()
-runTests = do
+import Markdown
+import Parser
+import Templating 
+
+allTests :: [IO ()]
+allTests = 
+    [ runTemplateTests
+    , runMarkdownTests
+    ]
+
+main :: IO ()
+main = sequence_ allTests
+
+-- Templating =========================================================
+runTemplateTests :: IO ()
+runTemplateTests = do
+    putStrLn "\ntemplating:"
     runTestExpect testRender
-    runTestExpect testTemplateFn
     runTestExpect testParseTemplate
 
-runTestExpect :: (Eq b, Show b) => TestExpect a b -> IO ()
-runTestExpect t = do
-    let expected = y t
-    let actual   = fn t (x t)
-    let passed   = expected == actual
-    let errMsg   = "\nexpected:\n" ++ show expected ++ "\n" ++ "actual:\n" ++ show actual
-    let status   = if passed then "OK" else "FAIL" ++ errMsg
-    let runMsg   = "testing " ++ name t ++ "..." ++ status
-    putStrLn runMsg
-
-data TestExpect a b = Test {name::String, fn::a -> b, x::a, y::b}
-
--- ==================== Templating.hs ====================
 -- tests rendering a basic Template with a Context
 testRender :: TestExpect (Template, Context) (Either String String)
 testRender = Test {
     name = "render catchall",
-    fn = uncurry render,
+    fn = uncurry renderTemplate,
     x  = (testTemplate , testContext),
     y  = Right "<div><p>post 1</p><p>post 2</p></div>"}
-
--- tests parsing and rendering a basic template string with a context
-testTemplateFn :: TestExpect (String, Context) (Either String String)
-testTemplateFn = Test {
-    name = "template catchall",
-    fn   = uncurry template,
-    x    = (testRawTemplate, testContext),
-    y    = Right "<div><p>post 1</p><p>post 2</p></div>" }
 
 -- tests parsing a raw template string into a Template
 testParseTemplate :: TestExpect String (Either ParseError Template)
@@ -76,195 +67,80 @@ testRawTemplate :: String
 testRawTemplate = "<div>{% for post in posts %}<p>{{post.contents}}</p>{% endfor %}</div>"
 
 
--- Helper to create parser test case
-parserTest :: Show a => String -> Parser a -> String -> Either ParseError a -> TestExpect String (Either ParseError a)
-parserTest name p input expected = Test {
-    name = name,
-    fn = parse p,
-    x = input,
-    y = expected
-}
-
--- Helper to extract just the value from a successful parse
-parse :: Parser a -> String -> Either ParseError a
-parse p input = case runP p (newInput input) of
-    Left err -> Left err
-    Right (a, _) -> Right a
-
--- Test cases for basic text formatting
-testPlaintext :: TestExpect String (Either ParseError MarkdownItem)
-testPlaintext = parserTest 
-    "plaintext basic" 
-    plaintext 
-    "hello" 
-    (Right $ Plaintext "hello" None "")
-
-testBold :: TestExpect String (Either ParseError MarkdownItem)
-testBold = parserTest 
-    "bold basic" 
-    boldText 
-    "*bold*" 
-    (Right $ Plaintext "bold" Bold "")
-
-testBoldEscape :: TestExpect String (Either ParseError MarkdownItem)
-testBoldEscape = parserTest 
-    "bold with escape" 
-    boldText 
-    "*bold\\*text*" 
-    (Right $ Plaintext "bold*text" Bold "")
-
-testItalic :: TestExpect String (Either ParseError MarkdownItem)
-testItalic = parserTest 
-    "italic basic" 
-    italicText 
-    "_italic_" 
-    (Right $ Plaintext "italic" Italic "")
-
--- Test cases for code blocks
-testInlineCode :: TestExpect String (Either ParseError MarkdownItem)
-testInlineCode = parserTest 
-    "inline code" 
-    inlineCode 
-    "```x = 1```" 
-    (Right $ Code "x = 1" "" False)
-
-testDisplayCode :: TestExpect String (Either ParseError MarkdownItem)
-testDisplayCode = parserTest 
-    "display code" 
-    displayCode 
-    "\n```\nx = 1\n```" 
-    (Right $ Code "x = 1" "" True)
-
--- Test cases for math
-testInlineMath :: TestExpect String (Either ParseError MarkdownItem)
-testInlineMath = parserTest 
-    "inline math" 
-    inlineMath 
-    "$x + y$" 
-    (Right $ Math "x + y" False)
-
-testDisplayMath :: TestExpect String (Either ParseError MarkdownItem)
-testDisplayMath = parserTest 
-    "display math" 
-    displayMath 
-    "$$x + y$$" 
-    (Right $ Math "x + y" True)
-
--- Test cases for headers
-testHeader :: TestExpect String (Either ParseError MarkdownItem)
-testHeader = parserTest 
-    "level 1 header" 
-    header 
-    "# Title" 
-    (Right $ Header "Title" 1)
-
-testSubheader :: TestExpect String (Either ParseError MarkdownItem)
-testSubheader = parserTest 
-    "level 2 header" 
-    subheader 
-    "## Subtitle" 
-    (Right $ Header "Subtitle" 2)
-
--- Test cases for links and images
-testLink :: TestExpect String (Either ParseError MarkdownItem)
-testLink = parserTest 
-    "basic link" 
-    link 
-    "[text](url)" 
-    (Right $ Link "text" "url")
-
-testImage :: TestExpect String (Either ParseError MarkdownItem)
-testImage = parserTest 
-    "basic image" 
-    image 
-    "![alt](url)" 
-    (Right $ Image "alt" "url")
-
--- Test cases for quotes
-testQuote :: TestExpect String (Either ParseError MarkdownItem)
-testQuote = parserTest 
-    "basic quote" 
-    quote 
-    "> quoted text" 
-    (Right $ Quote "quoted text")
-
--- Test cases for footnotes
-testFootref :: TestExpect String (Either ParseError MarkdownItem)
-testFootref = parserTest 
-    "footnote reference" 
-    footref 
-    "[^1]" 
-    (Right $ FootRef 1)
-
-testFootdef :: TestExpect String (Either ParseError MarkdownItem)
-testFootdef = parserTest 
-    "footnote definition" 
-    footdef 
-    "[^1]: footnote text:[1]" 
-    (Right $ FootDef 1 [Plaintext "footnote text" None ""])
-
--- Test cases for HTML
-testHtml :: TestExpect String (Either ParseError MarkdownItem)
-testHtml = parserTest 
-    "basic html" 
-    rawHtml 
-    "<div>" 
-    (Right $ RawHtml "div")
-
--- Test cases for dropdowns
-testDropdown :: TestExpect String (Either ParseError MarkdownItem)
-testDropdown = parserTest 
-    "basic dropdown" 
-    dropdown 
-    ".[Click me\nContent.]" 
-    (Right $ Dropdown "Click me" [Plaintext "Content" None ""])
-
--- Test cases for paragraphs
-testParagraph :: TestExpect String (Either ParseError MarkdownItem)
-testParagraph = parserTest 
-    "basic paragraph" 
-    paragraph 
-    "normal *bold* normal" 
-    (Right $ Paragraph [
-        Plaintext "normal" None "",
-        Plaintext "bold" Bold "",
-        Plaintext "normal" None ""
-    ])
-
--- Test cases for full documents
-testDocument :: TestExpect String (Either ParseError [MarkdownItem])
-testDocument = parserTest 
-    "basic document" 
-    document 
-    "\n\npara 1\n\npara 2\n\n" 
-    (Right [
-        Paragraph [Plaintext "para 1" None ""],
-        Paragraph [Plaintext "para 2" None ""]
-    ])
-
--- Run all tests
+-- Markdown Parser =========================================================
 runMarkdownTests :: IO ()
 runMarkdownTests = do
-    putStrLn "Running Markdown Parser Tests\n"
-    mapM_ runTestExpect
-        [ testPlaintext
-        , testBold
-        , testBoldEscape
-        , testItalic
-        , testInlineCode
-        , testDisplayCode
-        , testInlineMath
-        , testDisplayMath
-        , testHeader
-        , testSubheader
-        , testLink
-        , testImage
-        , testQuote
-        , testFootref
-        , testFootdef
-        , testHtml
-        , testDropdown
-        , testParagraph
+    putStrLn "\nMarkdown Parser Tests:"
+    mapM_ (runTestExpect . uncurry4 parserTest) atomicMarkdownParserTests
+    mapM_ (runTestExpect . uncurry4 parserTest) documentMarkdownParserTests
+    where uncurry4 f (a,b,c,d) = f a b c d
+
+atomicMarkdownParserTests :: [(String, Parser MarkdownItem, String, Either ParseError MarkdownItem)]
+atomicMarkdownParserTests = 
+    [ ("plaintext basic", plaintext, "hello", Right $ Plaintext "hello" None "")
+    , ("bold", boldText, "*bold*", Right $ Plaintext "bold" Bold "")
+    , ("bold escape", boldText, "*bold\\*text*", Right $ Plaintext "bold*text" Bold "")
+    , ("italic", italicText, "_italic_", Right $ Plaintext "italic" Italic "")
+    , ("inline code", inlineCode, "```x = 1```", Right $ Code "x = 1" "" False)
+    , ("display code", displayCode, "\n```\nx = 1\n```", Right $ Code "x = 1" "" True)
+    , ("inline math", inlineMath, "$x + y$", Right $ Math "x + y" False)
+    , ("display math", displayMath, "$$x + y$$", Right $ Math "x + y" True)
+    , ("level 1 header", header, "# Title", Right $ Header "Title" 1)
+    , ("level 2 header", subheader, "## Subtitle", Right $ Header "Subtitle" 2)
+    , ("basic link", link, "[text](url)", Right $ Link "text" "url")
+    , ("basic image", image, "![alt](url)", Right $ Image "alt" "url")
+    , ("basic quote", quote, "> quoted text", Right $ Quote "quoted text")
+    , ("footnote reference", footref, "[^1]", Right $ FootRef 1)
+    , ("footnote definition", footdef, "[^1]: footnote text:[1]"
+      , Right $ FootDef 1 [Plaintext "footnote text" None ""]
+      )
+    , ("basic html", rawHtml, "<div>", Right $ RawHtml "div")
+    , ("basic dropdown", dropdown, ".[Click me\nContent.]"
+      , Right $ Dropdown "Click me" [Plaintext "Content" None ""]
+      )
+    , ("basic paragraph", paragraph, "normal *bold* normal" 
+      , Right $ Paragraph
+        [Plaintext "normal" None "", Plaintext "bold" Bold "", Plaintext "normal" None ""]
+      )
+    ]
+
+documentMarkdownParserTests :: [(String, Parser [MarkdownItem], String, Either a [MarkdownItem])]
+documentMarkdownParserTests = 
+    [ ("basic document", document, "\n\npara 1\n\npara 2\n\n"
+      , Right [
+            Paragraph [Plaintext "para 1" None ""],
+            Paragraph [Plaintext "para 2" None ""]
         ]
-    runTestExpect testDocument
+      )
+    ]
+
+-- Internals =======================================================
+
+-- Test case constructor
+parserTest :: Show a => String -> Parser a -> 
+            String -> Either ParseError a 
+            -> TestExpect String (Either ParseError a)
+parserTest name p = Test name (parse p) 
+
+-- Parser runner
+parse :: Parser a -> String -> Either ParseError a
+parse p = fmap fst . runP p . newInput
+
+-- Test runner
+data TestExpect a b = Test 
+    { name :: String
+    , fn   :: a -> b
+    , x    :: a
+    , y    :: b
+    }
+
+runTestExpect :: (Eq b, Show b) => TestExpect a b -> IO ()
+runTestExpect (Test name fn input expected) = do
+    let actual = fn input
+        passed = expected == actual
+        status = if passed 
+                 then "OK" 
+                 else "FAIL\nexpected:\n" ++ show expected ++ "\nactual:\n" ++ show actual
+    putStrLn $ "Testing " ++ name ++ "..." ++ status
+
 

@@ -27,7 +27,6 @@ module Parser
 
 import Control.Applicative (many, Alternative, empty, (<|>))
 import Data.Char (isAlphaNum)
-import Control.Monad.Fail (MonadFail)
 
 type ErrorMsg   = String
 type LineNo     = Int
@@ -50,7 +49,7 @@ nextLine :: Position -> Position
 nextLine (l, _) = (l + 1, 0)
 
 advance :: Input -> Input
-advance (Input (c:cs) p@(line, col)) = 
+advance (Input (c:cs) p) = 
     Input cs $ case c of
         '\n' -> nextLine p
         _    -> nextCol p

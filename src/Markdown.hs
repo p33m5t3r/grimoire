@@ -1,9 +1,19 @@
-module Markdown where
+module Markdown 
+    ( MarkdownItem(..)
+    , parseMarkdown
+    , renderMarkdown
+    -- INTERNAL (testing):
+    , plaintext, boldText, italicText, inlineCode, displayCode
+    , inlineMath, displayMath, header, subheader, link, image
+    , quote, footref, footdef, rawHtml, dropdown, paragraph, document
+    , TextFormat(..)
+    ) where
 
 import Data.Char (isDigit)
-import Parser
 import Text.Read (readMaybe)
-import Control.Monad.Fail (MonadFail, fail)
+
+import Parser
+
 
 data TextFormat = None | Bold | Italic | BoldItalic 
     deriving (Show, Eq)
@@ -11,7 +21,6 @@ type Color = String
 type HeaderLevel = Int
 type IsDisplay = Bool
 type URL = String
-type SizeTag = String
 type IsOrdered = Bool
 
 data MarkdownItem
@@ -46,9 +55,6 @@ parseMarkdown s = case runP document s of
 
 -- PARSING
 -- more parser combinators
-escaped :: Parser Char
-escaped = one '\\' *> char
-
 nonEscaped :: Char -> Parser Char
 nonEscaped c = notChar '\\' >>= \x -> 
     if x == c then fail "unexpected delimiter"
@@ -83,7 +89,7 @@ plaintext = do
     
     -- Only consume a newline if it's not followed by another newline
     singleNewlineChunk = do
-        n1 <- one '\n'
+        _ <- one '\n'
         n2 <- char
         if n2 == '\n'
             then fail "double newline"  -- Don't consume double newlines
@@ -97,7 +103,7 @@ try p = Parser $ \input -> case runP p input of
 
 -- Helper for handling whitespace in text
 collapseWhitespace :: String -> String
-collapseWhitespace = unwords . words-- Code blocks
+collapseWhitespace = unwords . words
 
 -- code
 inlineCode :: Parser MarkdownItem
@@ -222,20 +228,20 @@ paragraph = do
     combineText (x:xs) = x : combineText xs
 
 
--- Improved document parser that splits on double newlines
 document :: Parser [MarkdownItem]
-document = do
-    many (oneOf " \t\n")  -- Consume leading whitespace
-    items <- sepBy paragraph (word "\n\n")
-    many (oneOf " \t\n")  -- Consume trailing whitespace
-    pure items
+document =
+    many (oneOf " \t\n") *>         -- TODO: take this from Parser
+    sepBy paragraph (word "\n\n") <*
+    many (oneOf " \t\n")
 
+-- TODO: move to parser
 oneOf :: String -> Parser Char
 oneOf chars = char >>= \c -> 
     if c `elem` chars 
     then pure c 
     else fail $ "expected one of: " ++ chars
 
+-- TODO: move to parser
 sepBy1 :: Parser a -> Parser b -> Parser [a]
 sepBy1 p sep = (:) <$> p <*> many (sep *> p)
 
@@ -260,11 +266,8 @@ renderItem item = case item of
 
 -- Helper functions for text formatting
 renderText :: String -> TextFormat -> String -> String
-renderText str fmt color = 
-    let colorAttr = if null color 
-            then "" 
-            else " style=\"color: " ++ color ++ "\"" 
-        (pre, post) = case fmt of
+renderText str fmt _ =      -- TODO: add coloring
+    let (pre, post) = case fmt of
             None -> ("","")
             Bold -> ("<strong>","</strong>")
             Italic -> ("<em>","</em>")

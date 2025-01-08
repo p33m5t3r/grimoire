@@ -1,8 +1,22 @@
 {-# LANGUAGE LambdaCase #-}
-module Templating where
+module Templating 
+    ( Template(..)
+    , Context(..)
+    , parseTemplate
+    , renderTemplate
+    ) where
+
 import qualified Data.Map as Map
-import Parser
 import Data.Char (isLetter)
+
+import Parser 
+    ( Parser(..)
+    , ParseError
+    , Input(..)
+    , newInput
+    , (<|>), many, some, word, ws, one
+    , cond, sepBy, char, betweenWS)
+
 
 data Template = Literal String
               | Expr [String]   -- path
@@ -15,33 +29,20 @@ data Context = String String
              | Object (Map.Map String Context)
              deriving Show
 
--- fills a template string with values from a context
-template :: String -> Context -> Either String String
-template t c = 
-    let errUnfinished = "failed to finish parsing"
-    in case parseTemplate t of
-        Left err -> Left $ "failed to parse: " ++ show err
-        Right (t, rest) -> 
-            if src rest == "" 
-                then case render t c of
-                    Left err -> Left $ "failed to render: " ++ err
-                    Right s -> Right s
-                else Left errUnfinished
-
--- renders a Template into a string from a context
-render :: Template -> Context -> Either String String
-render (Literal s)  _ = Right s
-render (Expr path)  c = strLookup path c
-render (Loop pth var t) c = case arrLookup [pth] c of
+-- Parsing/Rendering ==================================================
+renderTemplate :: Template -> Context -> Either String String
+renderTemplate (Literal s)  _ = Right s
+renderTemplate (Expr path)  c = strLookup path c
+renderTemplate (Loop pth var t) c = case arrLookup [pth] c of
     Left err -> Left err
-    Right arr -> concat <$> mapM (render t . toNamedCtx) arr
+    Right arr -> concat <$> mapM (renderTemplate t . toNamedCtx) arr
         where toNamedCtx o = Object $ Map.singleton var o
-render (Block ts) c = concat <$> mapM (`render` c) ts
+renderTemplate (Block ts) c = concat <$> mapM (`renderTemplate` c) ts
 
--- parses a template string into a Template
 parseTemplate :: String -> Either ParseError (Template, Input)
 parseTemplate = runP templateParser . newInput
 
+-- Context Lookups ====================================================
 -- look for values in a context
 lookupPath :: [String] -> Context -> Either String Context
 lookupPath [] v = Right v
@@ -49,9 +50,11 @@ lookupPath (key:rest) (Object m) =
     case Map.lookup key m of
         Nothing -> Left $ "'" ++ key ++ "' not found in ctx"
         Just v -> lookupPath rest v
-lookupPath p c = Left $ "expected object, got: " ++ show c
+lookupPath p c = Left $ "expected object, got: " 
+                        ++ show c ++ "at: " ++ show p
 
-typedLookup :: [String] -> Context -> (Context -> Either String a) -> Either String a
+typedLookup :: [String] -> Context -> (Context -> Either String a)
+            -> Either String a
 typedLookup pth c f = lookupPath pth c >>= f
 
 strLookup :: [String] -> Context -> Either String String
@@ -64,6 +67,7 @@ arrLookup pth c = typedLookup pth c $ \case
     Array a -> Right a
     other -> Left $ "expected array, got: " ++ show other
 
+-- Parsing ==========================================================
 templateParser :: Parser Template
 templateParser = Block <$> many templatePart
 
@@ -96,18 +100,14 @@ loopParser :: Parser Template
 loopParser = do
     (collection, var) <- betweenWS "{%" "%}" forHeader
     template <- templateParser
-    betweenWS "{%" "%}" (word "endfor")
+    _ <- betweenWS "{%" "%}" (word "endfor")
     return $ Loop var collection template
   where
-    forHeader = do
-        word "for"
-        ws
-        var <- some $ cond isLetter
-        ws
-        word "in"
-        ws
-        collection <- some $ cond isLetter
-        return (var, collection)
+    forHeader = (,)
+        <$  word "for" <*  ws
+        <*> some (cond isLetter)
+        <*  ws <*  word "in" <*  ws
+        <*> some (cond isLetter)
 
 
 

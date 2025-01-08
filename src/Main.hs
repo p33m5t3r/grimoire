@@ -1,11 +1,11 @@
 module Main where
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
-import Data.List (isPrefixOf)
-
-import Compile (AppConfig(..), compileAll, compileOne)
 import System.Directory (getCurrentDirectory)
 import System.FilePath ((</>))
+
+import Compile (AppConfig(..), compileAll, compileOne)
+
 
 {- usage
 compile everything:     grimoire compile
@@ -43,6 +43,8 @@ main = do
 
 handleCompile :: [String] -> IO ()
 handleCompile [] = do
+    cfg <- defaultConfig
+    print cfg
     putStrLn "Compiling all posts..."
     defaultConfig >>= compileAll
     
