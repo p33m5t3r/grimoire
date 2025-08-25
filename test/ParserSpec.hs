@@ -157,3 +157,19 @@ spec = describe "Parser" $ do
       parseInlines "This is {pink|pink text} and *bold*" `shouldBe`
         Right [Span "This is " [], Span "pink text" [Color "pink"], 
                Span " and " [], Span "bold" [Bold]]
+               
+    it "parses external links" $ do
+      parseInlines "[click here](https://example.com)" `shouldBe`
+        Right [Link External "https://example.com" [Span "click here" []]]
+        
+    it "parses internal links" $ do
+      parseInlines "[see post](@/posts/intro)" `shouldBe`
+        Right [Link Internal "/posts/intro" [Span "see post" []]]
+        
+    it "parses links with formatted text" $ do
+      parseInlines "[*bold link*](url)" `shouldBe`
+        Right [Link External "url" [Span "bold link" [Bold]]]
+        
+    it "parses mixed text with links" $ do
+      parseInlines "Check [this](url) out" `shouldBe`
+        Right [Span "Check " [], Link External "url" [Span "this" []], Span " out" []]

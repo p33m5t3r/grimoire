@@ -168,6 +168,7 @@ inline :: Parser Inline
 inline = choice
   [ try inlineCode  -- high precedence - no internal formatting
   , try inlineMath  -- high precedence - no internal formatting  
+  , try link        -- [text](url) or [text](@internal)
   , try colorText   -- {color|text} syntax
   , try boldText
   , try italicText
@@ -217,6 +218,16 @@ inlineMath = do
   content <- T.pack <$> manyTill anySingle (char '$')
   return $ InlineMath content
 
+-- Parse [link text](url) or [link text](@internal-path)
+link :: Parser Inline
+link = do
+  char '['
+  linkText <- manyTill inline (char ']')
+  char '('
+  linkType <- (char '@' >> return Internal) <|> return External
+  url <- T.pack <$> manyTill anySingle (char ')')
+  return $ Link linkType url linkText
+
 -- Parse plain text until next special character
 plainSpan :: Parser Inline
 plainSpan = do
@@ -224,7 +235,7 @@ plainSpan = do
   return $ Span text []
   where
     plainChar = satisfy (\c -> not (c `elem` (specialChars :: String)))
-    specialChars = "*_`${[\\}"  -- characters that start special constructs
+    specialChars = "*_`${[\\}]"  -- characters that start special constructs (added ] for links)
 
 -- Helper: Convert inline list back to text (for nested parsing)
 inlinesToText :: [Inline] -> Text

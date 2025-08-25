@@ -13,6 +13,8 @@ testInput = T.unlines
   [ "# Main Header"
   , ""
   , "This is a *bold* paragraph with _italic_ and {pink|colored} text."
+  , ""
+  , "Check out [my blog](https://example.com) or [this post](@/posts/intro)."
   , ""  
   , "```haskell"
   , "main = putStrLn \"hello\""
