@@ -104,3 +104,56 @@ spec = describe "Parser" $ do
     it "handles leading newlines" $ do
       parseDocument "\n\n# Header\n\nText" `shouldBe`
         Right (Document [HeaderBlock 1 "Header", TextBlock ["Text"]])
+
+  describe "inline parsing" $ do
+    it "parses plain text" $ do
+      parseInlines "Hello world" `shouldBe`
+        Right [Span "Hello world" []]
+    
+    it "parses bold text" $ do
+      parseInlines "*bold*" `shouldBe`
+        Right [Span "bold" [Bold]]
+        
+    it "parses italic text" $ do
+      parseInlines "_italic_" `shouldBe`
+        Right [Span "italic" [Italic]]
+        
+    it "parses inline code" $ do
+      parseInlines "`code`" `shouldBe`
+        Right [InlineCode "code"]
+        
+    it "parses inline math" $ do  
+      parseInlines "$x^2$" `shouldBe`
+        Right [InlineMath "x^2"]
+        
+    it "parses mixed formatting" $ do
+      parseInlines "This is *bold* and _italic_ text" `shouldBe`
+        Right [Span "This is " [], Span "bold" [Bold], Span " and " [], 
+               Span "italic" [Italic], Span " text" []]
+               
+    it "parses nested formatting" $ do
+      parseInlines "*bold _and italic_*" `shouldBe`
+        Right [Span "bold and italic" [Bold]]
+        -- Note: This is the current implementation - it flattens nesting
+        
+    it "handles code with no internal formatting" $ do
+      parseInlines "`*no bold here*`" `shouldBe`
+        Right [InlineCode "*no bold here*"]
+        
+    it "handles math with no internal formatting" $ do
+      parseInlines "$*not bold*$" `shouldBe`
+        Right [InlineMath "*not bold*"]
+        
+    it "parses color text" $ do
+      parseInlines "{red|colored text}" `shouldBe`
+        Right [Span "colored text" [Color "red"]]
+        
+    it "parses color with nested formatting" $ do
+      parseInlines "{blue|*bold blue*}" `shouldBe`
+        Right [Span "bold blue" [Color "blue"]]
+        -- Note: Like bold/italic, nesting currently flattens
+        
+    it "parses mixed colors and formatting" $ do
+      parseInlines "This is {pink|pink text} and *bold*" `shouldBe`
+        Right [Span "This is " [], Span "pink text" [Color "pink"], 
+               Span " and " [], Span "bold" [Bold]]

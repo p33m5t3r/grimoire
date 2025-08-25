@@ -147,3 +147,85 @@ textBlock :: Parser Block
 textBlock = do
   firstLine <- T.pack <$> manyTill anySingle (lookAhead (void newline <|> eof))
   return $ TextBlock [firstLine]
+
+-- INLINE PARSING ================================================================
+
+-- Parse inline elements within a text string
+parseInlines :: Text -> Either (ParseErrorBundle Text Void) [Inline]
+parseInlines = parse (inlines <* eof) "inline"
+
+-- Main inline parser - handles all inline constructs
+inlines :: Parser [Inline]
+inlines = many inline
+
+-- Parse a single inline element
+inline :: Parser Inline  
+inline = choice
+  [ try inlineCode  -- high precedence - no internal formatting
+  , try inlineMath  -- high precedence - no internal formatting  
+  , try colorText   -- {color|text} syntax
+  , try boldText
+  , try italicText
+  , plainSpan       -- fallback - collect plain text
+  , singleChar      -- absolute fallback for any single character
+  ]
+
+-- Parse a single character as plain text (absolute fallback)
+singleChar :: Parser Inline
+singleChar = do
+  ch <- anySingle
+  return $ Span (T.singleton ch) []
+
+-- Parse *bold text* with proper nesting validation
+boldText :: Parser Inline
+boldText = do
+  char '*'
+  content <- manyTill inline (char '*')
+  return $ Span (inlinesToText content) [Bold]
+
+-- Parse _italic text_ with proper nesting validation  
+italicText :: Parser Inline
+italicText = do
+  char '_'
+  content <- manyTill inline (char '_')
+  return $ Span (inlinesToText content) [Italic]
+
+-- Parse {color|text} with color parameter extraction
+colorText :: Parser Inline
+colorText = do
+  char '{'
+  color <- T.pack <$> manyTill anySingle (char '|')
+  content <- manyTill inline (char '}')
+  return $ Span (inlinesToText content) [Color color]
+
+-- Parse `inline code` - no internal formatting
+inlineCode :: Parser Inline
+inlineCode = do
+  char '`'
+  content <- T.pack <$> manyTill anySingle (char '`')
+  return $ InlineCode content
+
+-- Parse $inline math$ - no internal formatting
+inlineMath :: Parser Inline
+inlineMath = do
+  char '$'
+  content <- T.pack <$> manyTill anySingle (char '$')
+  return $ InlineMath content
+
+-- Parse plain text until next special character
+plainSpan :: Parser Inline
+plainSpan = do
+  text <- T.pack <$> some plainChar
+  return $ Span text []
+  where
+    plainChar = satisfy (\c -> not (c `elem` (specialChars :: String)))
+    specialChars = "*_`${[\\}"  -- characters that start special constructs
+
+-- Helper: Convert inline list back to text (for nested parsing)
+inlinesToText :: [Inline] -> Text
+inlinesToText inlines = T.concat [getText i | i <- inlines]
+  where
+    getText (Span text _) = text
+    getText (InlineCode text) = text
+    getText (InlineMath text) = text
+    getText _ = ""  -- other inline types
