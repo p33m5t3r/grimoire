@@ -1,0 +1,665 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0xpemulis.net</title>
+    <style>
+        /* Resetting some default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            /* font-family: 'Arial', sans-serif; */
+            font-family: 'Fira Code', monospace;
+            background-color: #000; /* Black background */
+            color: #fff; /* White text */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: start;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        header {
+            width: 95%;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        header div {
+            display: flex;
+            flex-wrap: wrap; /* Allow the buttons to wrap as a group */
+            justify-content: flex-end; /* Align buttons to the right */
+            gap: 10px; /* Add space between buttons */
+        }
+
+        header a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1rem;
+            white-space: nowrap; /* Prevent the text inside from wrapping */
+            margin: 0; /* Remove additional margins */
+        }
+
+
+        header a:hover {
+            text-decoration: underline;
+        }
+
+        .frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Prevent the frame from interfering with clicks */
+        }
+
+        .frame:before, .frame:after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 2px; /* Top and bottom border */
+            background-color: #fff;
+        }
+
+        .frame:before {
+            top: min(2%, 20px);
+        }
+
+        .frame:after {
+            bottom: min(2%, 20px);
+        }
+
+        .frame div {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px; /* Left and right border */
+            background-color: #fff;
+        }
+
+        .frame div.left {
+            left: min(2%, 20px);
+        }
+
+        .frame div.right {
+            right: min(2%, 20px);
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .tag-sort {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #fff;
+            padding-bottom: 10px;
+        }
+
+        .post {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        
+        .post img {
+            font-size: 0.5rem;      /* alt text */
+            max-width: 60px;        /* Set a maximum width */
+            height: auto;           /* Maintain the aspect ratio */
+            background-color: #555; /* Placeholder color for image */
+            margin-right: 20px;
+            flex-shrink: 0;         /* Prevent shrinking */
+        }
+
+        .post-info {
+            font-size: 1rem;
+        }
+
+        .post-info h2 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .post-info p {
+            font-size: 0.9rem;
+            color: #aaa; /* Lighter gray for descriptions */
+        }
+
+        .pink {
+            color: #FFA4EA;  /* Pink base color */
+        }
+
+        .blue {
+            color: #cdedf6;
+        }
+
+        .green {
+            color: #beffc7;
+        }
+
+        .yellow {
+            color: #FFF6A3;
+        }
+
+        .purple {
+            color: #B492FF;
+        }
+
+        @font-face {
+          font-family: "Fira Code";
+          src: local("Fira Code"),
+               url("./fonts/FiraCode.woff2") format("woff2");
+          font-weight: 400;
+          font-style: normal;
+        }
+
+        /* Individual inline code spans */
+        code {
+          font-family: "Fira Code", monospace;
+          background-color: #242424;
+          color: #e0e0e0;
+          font-size: 0.9em;
+          /* word-wrap: break-word; */
+          /* overflow-wrap: break-word; */
+        }
+
+        /* Code block container */
+        pre {
+          background-color: #242424;
+          padding: 0.5rem;
+          margin: 0.5rem 0;
+          overflow-x: auto;
+          border: 1px solid #fff;
+        }
+
+        /* Code within a pre block */
+        pre code {
+          background-color: transparent;
+          padding: 0;
+          border-radius: 0;
+          display: block;
+          line-height: 1.5;
+          /* white-space: pre-wrap; */
+          /* word-break: break-word; */
+          font-size: 0.875rem;
+        }
+
+        /* scrollbar for horizontal overflow */
+        pre::-webkit-scrollbar {
+          height: 8px;
+        }
+
+        pre::-webkit-scrollbar-thumb {
+          background-color: #4a4a4a;
+          border-radius: 4px;
+        }
+
+        pre::-webkit-scrollbar-track {
+          background-color: #2a2a2a;
+          border-radius: 4px;
+        }
+
+        .inline-code {
+          font-family: "Fira Code", monospace;
+          background-color: #242424;
+          padding: 1px 2px;
+          border-radius: 3px;
+        }
+
+        details {
+            border: 1px solid #fff;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        summary {
+            cursor: pointer;
+            padding: 10px;
+            border-bottom: 1px solid #fff;
+            font-weight: 500;
+            font-style: italic;
+        }
+
+        details[open] summary {
+            border-bottom: 1px solid #fff;
+        }
+
+        details > p {
+            padding: 10px;
+            margin: 0;
+            /* background-color: white; */
+        }
+
+        /* Optional: Add some hover effects */
+        details:hover {
+            border-color: #999;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        summary:hover {
+            background-color: #242424;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.1em;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5em;
+        }
+
+        p {
+            margin-bottom: 20px;
+        }
+
+        /* Base list styles */
+        ul, ol {
+          padding-left: 2rem;
+          margin: 1rem 0;
+        }
+
+        /* Nested list adjustments */
+        ul ul, 
+        ul ol,
+        ol ul,
+        ol ol {
+          margin: 0.25rem 0;
+        }
+
+        /* List items */
+        li {
+          padding-left: 0.5rem;
+          margin: 0.25rem 0;
+        }
+
+        /* Ensure bullets/numbers stay with text on wrap */
+        li::marker {
+          margin-right: 0.5rem;
+        }
+
+        /* Optional: Custom styling for unordered lists */
+        ul {
+          list-style-type: disc;
+        }
+
+        ul ul {
+          list-style-type: circle;
+        }
+
+        ul ul ul {
+          list-style-type: square;
+        }
+
+        /* Optional: Custom styling for ordered lists */
+        ol {
+          list-style-type: decimal;
+        }
+
+        ol ol {
+          list-style-type: lower-alpha;
+        }
+
+        ol ol ol {
+          list-style-type: lower-roman;
+        }
+
+        .tooltip {
+          position: fixed;  /* or absolute if parent is positioned */
+          background: #242424;
+          border: 1px solid #ddd;
+          padding: 10px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          max-width: 40%;
+          z-index: 1000;
+        }
+
+        /* math-y definitions etc */
+        .recall {
+            color: #beffc7;
+            text-decoration: none;
+        }
+        
+        /* Default link state */
+        a {
+            color: #fff;
+        }
+
+        /* Hover state */
+        a:hover {
+            color: grey;
+        }
+
+        /* Active state (when clicked) */
+        a:active {
+            color: white;
+        }
+
+        /* Base image styles */
+        .md-img {
+          max-width: 80%;
+          height: auto;
+        }
+
+        /* Standalone centered images */
+        p > .md-img:only-child {
+          display: block;
+          margin: 0 auto;
+        }
+
+        /* Paragraphs with inline images */
+        .p-next-to-img {
+          overflow: auto; /* Create block formatting context */
+        }
+
+        /* Inline images in paragraphs */
+        .p-next-to-img > .md-img {
+          float: right;
+          max-width: 40%; /* Ensure room for text */
+          margin-left: 1em;
+          margin-bottom: 1em;
+        }
+
+        /* Image table container */
+        .img-table {
+         border-collapse: collapse;
+         max-width: 80%;
+         margin: 1em auto;
+         table-layout: fixed; /* Force equal column widths */
+        }
+
+        .img-table td {
+         padding: 0.1em;
+         border: none;
+         vertical-align: middle;
+        }
+
+        /* Images inside table cells */
+        .img-table .md-img {
+         width: 100%;  /* Fill cell width */
+         height: 300px; /* Consistent height */
+         object-fit: cover; /* Scale and crop to fill */
+         object-position: center; /* Center the cropping */
+         margin: 0;
+         display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #000;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #fff;
+        }
+
+        th {
+            font-weight: 1000;
+        }
+
+        /* Zebra striping for better readability */
+        tr:nth-child(even) {
+            background-color: #242424;
+        }
+
+        /* Hover effect consistent with your other hover states */
+        tr:hover {
+            background-color: #333;
+        }
+
+        /* For tables that might overflow on mobile */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+    </style>
+</head>
+
+<body>
+    <header>
+        <div>0xpemulis.net</div>
+        <div>
+            <a href="#">[ home ]</a>
+            <a href="#">[ prev ]</a>
+            <a href="#">[ next ]</a>
+        </div>
+    </header>
+
+    <!-- Hashtag-style border -->
+    <div class="frame">
+        <div class="left"></div>
+        <div class="right"></div>
+    </div>
+
+    
+<div class="container">
+    <article class="post-content">
+
+        <h1> this is a section header </h1> <hr> <br>
+        <h2> this is a subsection header </h2>
+        <p> this is a paragraph </p>
+        <p> ... and this is another paragraph</p>
+        <p> a third, but ... 
+            <strong> this is bold. </strong>
+            <em> this is italic </em>
+            <span class="pink">pink</span>
+            <span class="yellow">yellow</span>
+            <span class="green">green</span>
+            <span class="blue">blue</span>
+            <span class="purple">purple</span>
+        </p>
+        <p> this is inline code .hs fmt'd:
+        <span class="inline-code"> 
+            fmap 
+            <span class="purple">:: </span>(a 
+            <span class="purple"> -> </span> b) 
+            <span class="purple">-> </span>f a 
+            <span class="purple">-> </span>f b 
+        </span>
+        </p>
+
+        <!-- horizontal rule -->
+        <br>
+        <hr>
+        <br>
+        <!-- horizontal rule -->
+
+        <details>
+            <summary> this is a dropdown </summary>
+            <p> this is a paragraph inside a dropdown </p>
+        </details>
+
+        <p> this has a footnote
+            <sup>
+                <a class="footnote-ref" id="src1" href="#fn1" data-footnote-id="1">[1]</a>
+                <div id="tooltip-1" class="tooltip" role="tooltip" hidden>
+                    <p> this is a footnote paragraph in the hover </p>
+                    <p> another paragraph in the hover...
+                        <strong> with bold... </strong>
+                        <em> and italic </em>
+                        text
+                    </p>
+                    <p> TODO: add some inline math here as well </p>
+                    <p> what if its rly big tho </p>
+                    <p> what if its rly big tho </p>
+                    <p> what if its rly big tho </p>
+                    <p> what if its rly big tho </p>
+                    <p> what if its rly big tho </p>
+                </div>
+
+            </sup>
+        </p>
+        
+        <p> 
+            math definition/concept recalls: 
+            <span>
+                <a class="recall footnote-ref" href="#recall-group" data-footnote-id="group">Groups</a>
+            </span> form a nice subject category.
+        </p>
+        
+        <!-- put me in somewhere once you find the data to fill me out! -->
+        <div id="tooltip-group" class="tooltip" role="tooltip" hidden>
+            <h4>Group (Abstract Algebra)</h4>
+            <p>A set G with a binary operation • that satisfies:</p>
+            <ul>
+                <li>Closure: For all a,b ∈ G, a•b ∈ G</li>
+                <li>Associativity: (a•b)•c = a•(b•c)</li>
+                <li>Identity: There exists e ∈ G where e•a = a•e = a</li>
+                <li>Inverse: For each a ∈ G, there exists b ∈ G where a•b = b•a = e</li>
+            </ul>
+        </div>
+
+        <p>
+            <a href="https://ncatlab.org/nlab/show/monad">
+                this is a link
+            </a>
+        </p>
+
+        <p class="p-next-to-img">
+            <img class="md-img" src="https://i.sstatic.net/Ar4tw.png" alt="this is a caption">
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+            this is what paragraph text looks like when there's an image within the paragraph
+        </p>
+
+        <br> 
+        <p>
+            This is what a standalone image should look like:
+        </p>
+        <p>
+            <img class="md-img" src="https://i.sstatic.net/Ar4tw.png">
+        </p>
+
+        <p> below is a table of images: </p>
+
+        <table class="img-table">
+            <tr>
+                <td> <img class="md-img" src="https://windybot.com/thumb/DZuWyVg5HaQXvf7rRKzS.jpg"> </td>
+                <td> 
+                    <img class="md-img" 
+                        src="https://i.natgeofe.com/n/548467d8-c5f1-4551-9f58-6817a8d2c45e/NationalGeographic_2572187.jpg?w=748&h=500"> 
+                </td>
+            </tr>
+        </table>
+
+        <p> below is a normal table </p>
+        <table>
+          <tr>
+            <th> col 1 </th>
+            <th> col 2 </th>
+          </tr>
+          <tr>
+            <td> a11 </td>
+            <td> a12 </td>
+          </tr>
+          <tr>
+            <td> a21 </td>
+            <td> a22 </td>
+          </tr>
+        </table>
+
+        <p> below is a code block </p>
+        <pre><code># this is what really short code looks like
+<span class="yellow">def</span> f(x: <span class="yellow">int</span>, n: <span class="yellow">int</span>):
+    <span class="yellow">return</span> [pow(x, i) for i in <span class="yellow">range</span>(n)]
+</code></pre>
+
+        <pre><code># this is what really long code looks like (no highlight)
+X_train, X_test, y_train, y_test = train_test_split(data['X'], data['y']) X_train, X_test, y_train, y_test = train_test_split(data['X'], data['y'])
+    pass</code></pre>
+
+        <ul>
+            <li>unordered list bullet 1</li>
+                <ul> 
+                    <li> sub item </li> 
+                    <ul> <li> sub-sub item </li> </ul>
+                </ul>
+            <li>unordered list bullet 2</li>
+            <li>unordered list bullet 3</li>
+        </ul>
+        
+        <ol>
+            <li>ordered list bullet 1</li>
+            <ol> 
+                <li> sub item </li> 
+                <ol> <li> sub-sub item </li> </ol>
+            </ol>
+            <li>ordered list bullet 2</li>
+            <li>ordered list bullet 3</li>
+        </ol>
+
+        <p> 
+            this is what a really long paragraph looks like: ... 
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+            Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris 
+            nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in 
+            reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla 
+            pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
+            culpa qui officia deserunt mollit anim id est laborum.
+        </p>
+
+
+        <br>
+        <p> <strong> notes & errata </strong> </p>
+        <hr>
+        <br>
+        <div>
+            <div id="fn1" class="footnote">
+                <p> 
+                <a href="#src1">[<- 1]</a>
+                this is a footnote paragraph in the footer </p>
+            </div>
+        </div> 
+
+
+    </article>
+</div>
+    <script>
+    document.querySelectorAll('.footnote-ref').forEach(ref => {
+      const tooltip = document.getElementById(`tooltip-${ref.dataset.footnoteId}`);
+      
+      ref.addEventListener('mouseenter', () => {
+        tooltip.hidden = false;
+        // Position tooltip near ref
+        const rect = ref.getBoundingClientRect();
+        tooltip.style.left = `${rect.left}px`;
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
+      });
+      
+      ref.addEventListener('mouseleave', () => {
+        tooltip.hidden = true;
+      });
+    });
+    </script>
+
+
+</body>
+</html>
