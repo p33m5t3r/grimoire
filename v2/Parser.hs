@@ -100,7 +100,7 @@ mathBlock = do
 quoteBlock :: Parser Block
 quoteBlock = do
   firstLine <- quoteLine
-  restLines <- many (newline >> quoteLine)
+  restLines <- many (try $ newline >> quoteLine)
   return $ QuoteBlock (firstLine : restLines)
   where
     quoteLine = do
@@ -113,7 +113,7 @@ quoteBlock = do
 listBlock :: Parser Block
 listBlock = do
   firstItem <- listItem
-  restItems <- many (newline >> listItem)
+  restItems <- many (try $ newline >> listItem)
   return $ ListBlock Unordered (firstItem : restItems)
   where
     listItem = do

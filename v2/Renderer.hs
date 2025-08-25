@@ -8,16 +8,21 @@ import Parser (parseInlines)
 
 renderDocument :: Document -> Text
 renderDocument (Document blocks) = 
-  wrapHtml $ T.concat (map renderBlock blocks)
+  T.concat (map renderBlock blocks)
 
-wrapHtml :: Text -> Text
-wrapHtml content = T.unlines
+-- Full HTML wrapper (moved from renderDocument for flexibility)
+renderFullDocument :: Document -> Text -> Text
+renderFullDocument doc title = 
+  wrapHtml title $ renderDocument doc
+
+wrapHtml :: Text -> Text -> Text  
+wrapHtml title content = T.unlines
   [ "<!DOCTYPE html>"
   , "<html lang=\"en\">"
   , "<head>"
   , "    <meta charset=\"UTF-8\">"
   , "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-  , "    <title>Document</title>"
+  , "    <title>" <> title <> "</title>"
   , "    <link rel=\"stylesheet\" href=\"style.css\">"
   , "</head>"
   , "<body>"
