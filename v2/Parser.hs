@@ -1,5 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Parser where
+module Parser 
+  ( parseDocument
+  , parseInlines
+  , Parser
+  , Document(..)
+  ) where
 
 import Control.Monad (void)
 import Data.Text (Text)
@@ -20,9 +25,9 @@ parseDocument = parse (document <* eof) "input"
 -- Main document parser
 document :: Parser Document
 document = do
-  many newline  -- skip leading newlines
-  blocks <- block `sepEndBy` (newline >> newline >> many newline)
-  many newline  -- consume trailing newlines
+  _ <- many newline  -- skip leading newlines
+  blocks <- block `sepEndBy` (try (newline >> newline >> many newline) <|> (newline >> eof >> return []))
+  _ <- many newline  -- consume trailing newlines
   return $ Document (filter (not . isEmptyBlock) blocks)
 
 -- Helper to filter out empty text blocks

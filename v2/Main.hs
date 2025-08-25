@@ -2,15 +2,17 @@
 module Main where
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Types
 import Parser
+import Renderer
 
 -- Test MDX input
 testInput :: T.Text
 testInput = T.unlines
   [ "# Main Header"
   , ""
-  , "This is a paragraph."
+  , "This is a *bold* paragraph with _italic_ and {pink|colored} text."
   , ""  
   , "```haskell"
   , "main = putStrLn \"hello\""
@@ -21,9 +23,9 @@ testInput = T.unlines
 
 main :: IO ()
 main = do
-  putStrLn "Grimoire v2 - Testing parser..."
+  putStrLn "Grimoire v2 - Testing renderer..."
   case parseDocument testInput of
     Left err -> putStrLn $ "Parse error: " ++ show err
     Right doc -> do
-      putStrLn "Parsed successfully:"
-      print doc
+      putStrLn "Parsed successfully. HTML output:"
+      TIO.putStrLn $ renderDocument doc
