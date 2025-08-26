@@ -8,6 +8,7 @@ import Data.Map (Map)
 import Data.Time (Day)
 import Data.Time.Format (parseTimeM, defaultTimeLocale)
 import CompileError
+import Template (ToContext(..), Context(..))
 
 -- Concrete metadata instead of Map String String
 data PostMetadata = PostMetadata
@@ -23,6 +24,23 @@ data PostContext = PostContext
   { postMeta :: PostMetadata
   , postContent :: Text  -- rendered article HTML
   } deriving (Show, Eq)
+
+-- ToContext instances
+instance ToContext PostMetadata where
+  toContext meta = Object $ Map.fromList
+    [ ("title", toContext $ postTitle meta)
+    , ("slug", toContext $ postSlug meta)
+    , ("description", toContext $ postDescription meta)
+    , ("tags", toContext $ postTags meta)
+    , ("date", toContext $ postDate meta)
+    ]
+
+instance ToContext PostContext where  
+  toContext ctx = Object $ Map.fromList
+    [ ("post", toContext $ postMeta ctx)
+    , ("content", toContext $ postContent ctx)
+    , ("title", toContext $ postTitle $ postMeta ctx)  -- convenient shortcut
+    ]
 
 -- Convert YAML map to structured metadata
 parseMetadata :: Text -> Map Text Text -> Either CompileError PostMetadata  

@@ -57,7 +57,8 @@ library
                       Renderer,
                       PostMetadata,
                       CompileError,
-                      Compiler
+                      Compiler,
+                      Template
     hs-source-dirs:   v2
     build-depends:    base,
                       megaparsec,
@@ -89,8 +90,10 @@ test-suite grimoire-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Spec.hs
-    other-modules:    ParserSpec
+    other-modules:    ParserSpec,
+                      TemplateSpec
     build-depends:    base,
                       grimoire,
                       hspec,
-                      text
+                      text,
+                      containers

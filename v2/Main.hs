@@ -11,19 +11,22 @@ import System.Exit (exitFailure)
 import Compiler
 import CompileError (CompileError, displayError)
 import PostMetadata
+import Template (Template, parseTemplate, renderTemplate, ToContext(..))
 
 -- Configuration for compilation
 data AppConfig = AppConfig
   { postsDir :: FilePath
   , outputDir :: FilePath
   , staticDir :: FilePath  -- for images
+  , templatesDir :: FilePath
   } deriving (Show, Eq)
 
 defaultConfig :: AppConfig  
 defaultConfig = AppConfig
   { postsDir = "posts"
   , outputDir = "www"
-  , staticDir = "www/static/images"  
+  , staticDir = "www/static/images"
+  , templatesDir = "templates"
   }
 
 main :: IO ()
@@ -37,6 +40,9 @@ compileAll config = do
   createDirectoryIfMissing True (outputDir config)
   createDirectoryIfMissing True (staticDir config)
   
+  -- Load post template  
+  postTemplate <- loadTemplate config "post.html"
+  
   -- Discover post directories
   postDirs <- discoverPostDirs (postsDir config)
   
@@ -48,7 +54,7 @@ compileAll config = do
       putStrLn $ "Found " ++ show (length postDirs) ++ " posts to compile"
       
       -- Compile each post
-      results <- mapM (compilePostDir config) postDirs
+      results <- mapM (compilePostDir config postTemplate) postDirs
       let failures = [err | Left err <- results]
       
       if null failures
@@ -75,8 +81,8 @@ discoverPostDirs postsRoot = do
       doesFileExist postPath
 
 -- Compile a single post directory  
-compilePostDir :: AppConfig -> FilePath -> IO (Either CompileError ())
-compilePostDir config postDir = do
+compilePostDir :: AppConfig -> Template -> FilePath -> IO (Either CompileError ())
+compilePostDir config template postDir = do
   let postPath = postsDir config </> postDir </> "post.mdx"
       outputPath = outputDir config </> postDir <.> "html"
       slug = T.pack postDir
@@ -91,26 +97,22 @@ compilePostDir config postDir = do
     Left err -> return $ Left err
     Right (metadata, document) -> do
       let articleHtml = compilePost metadata document
-          -- Use the proper HTML wrapper with title
-          fullHtml = wrapInBasicHtml (postTitle metadata) articleHtml
+          postCtx = PostContext metadata articleHtml
       
-      -- Write output
-      TIO.writeFile outputPath fullHtml
-      return $ Right ()
+      -- Render with template
+      case renderTemplate template (toContext postCtx) of
+        Left err -> return $ Left err
+        Right fullHtml -> do
+          TIO.writeFile outputPath fullHtml
+          return $ Right ()
 
--- Temporary: wrap article in basic HTML until we have templates
-wrapInBasicHtml :: T.Text -> T.Text -> T.Text
-wrapInBasicHtml title articleContent = T.unlines
-  [ "<!DOCTYPE html>"
-  , "<html lang=\"en\">"
-  , "<head>"
-  , "    <meta charset=\"UTF-8\">"
-  , "    <title>" <> title <> "</title>"
-  , "</head>"
-  , "<body>"
-  , "    <article class=\"post-content\">"
-  , articleContent
-  , "    </article>"
-  , "</body>"
-  , "</html>"
-  ]
+-- Load and parse a template file
+loadTemplate :: AppConfig -> FilePath -> IO Template
+loadTemplate config templateName = do
+  let templatePath = templatesDir config </> templateName
+  templateContent <- TIO.readFile templatePath
+  case parseTemplate templateContent of
+    Left err -> do
+      putStrLn $ "Failed to parse template " ++ templateName ++ ": " ++ T.unpack (displayError err)
+      exitFailure  
+    Right template -> return template
